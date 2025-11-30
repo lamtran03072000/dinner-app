@@ -1,24 +1,23 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, X, Bot, Loader2, Sparkles } from 'lucide-react';
-import { sendMessageToGemini } from '../services/geminiService';
-import { ChatMessage } from '../types';
+import React, { useState, useRef, useEffect } from "react";
+import { MessageSquare, Send, X, Bot, Loader2, Sparkles } from "lucide-react";
+import { ChatMessage } from "../types";
 
 const AIChatbot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      id: 'welcome',
-      role: 'model',
-      text: 'Xin chào! Tôi là Trợ lý ảo của Dinner App. Bạn đang quan tâm đến giải pháp gọi món qua QR Code để tối ưu chi phí cho quán phải không?',
-      timestamp: new Date()
-    }
+      id: "welcome",
+      role: "model",
+      text: "Xin chào! Tôi là Trợ lý ảo của Dinner App. Bạn đang quan tâm đến giải pháp gọi món qua QR Code để tối ưu chi phí cho quán phải không?",
+      timestamp: new Date(),
+    },
   ]);
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -30,41 +29,56 @@ const AIChatbot: React.FC = () => {
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
-      role: 'user',
+      role: "user",
       text: inputText,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMsg]);
-    setInputText('');
+    setMessages((prev) => [...prev, userMsg]);
+    setInputText("");
     setIsLoading(true);
 
     try {
-        // Format history for Gemini
-      const history = messages.map(msg => ({
-        role: msg.role === 'model' ? 'model' : 'user',
-        parts: [{ text: msg.text }]
+      // Format history for server API
+      const history = messages.map((msg) => ({
+        role: msg.role === "model" ? "model" : "user",
+        parts: [{ text: msg.text }],
       }));
 
-      const responseText = await sendMessageToGemini(userMsg.text, history);
+      const resp = await fetch("/api/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMsg.text, history }),
+      });
+
+      if (!resp.ok) {
+        console.error(
+          "Server returned error from /api/gemini",
+          await resp.text()
+        );
+      }
+
+      const data = await resp.json().catch(() => ({}));
+      const responseText =
+        data?.text || "Xin lỗi, tôi không thể trả lời lúc này.";
 
       const botMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        role: 'model',
-        text: responseText || "Xin lỗi, tôi không thể trả lời lúc này.",
-        timestamp: new Date()
+        role: "model",
+        text: responseText,
+        timestamp: new Date(),
       };
-      
-      setMessages(prev => [...prev, botMsg]);
+
+      setMessages((prev) => [...prev, botMsg]);
     } catch (error) {
-      console.error(error);
+      console.error("Error sending message to server /api/gemini:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSend();
+    if (e.key === "Enter") handleSend();
   };
 
   return (
@@ -72,20 +86,21 @@ const AIChatbot: React.FC = () => {
       {/* Toggle Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className={`fixed bottom-6 right-6 z-40 bg-primary text-white p-4 rounded-full shadow-2xl hover:bg-orange-700 transition-all transform hover:scale-110 flex items-center justify-center gap-2 ${isOpen ? 'hidden' : 'flex'}`}
+        className={`fixed bottom-6 right-6 z-40 bg-primary text-white p-4 rounded-full shadow-2xl hover:bg-orange-700 transition-all transform hover:scale-110 flex items-center justify-center gap-2 ${
+          isOpen ? "hidden" : "flex"
+        }`}
       >
         <MessageSquare size={24} />
         <span className="font-bold hidden md:inline">Tư vấn Dinner App</span>
         <span className="absolute -top-1 -right-1 flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
         </span>
       </button>
 
       {/* Chat Window */}
       {isOpen && (
         <div className="fixed bottom-6 right-6 z-50 w-[90vw] md:w-[400px] h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-100 animate-in slide-in-from-bottom-10 fade-in duration-300">
-          
           {/* Header */}
           <div className="bg-primary p-4 flex items-center justify-between text-white">
             <div className="flex items-center gap-3">
@@ -100,7 +115,7 @@ const AIChatbot: React.FC = () => {
                 </div>
               </div>
             </div>
-            <button 
+            <button
               onClick={() => setIsOpen(false)}
               className="text-white/80 hover:text-white p-1 hover:bg-white/10 rounded-lg transition-colors"
             >
@@ -111,32 +126,36 @@ const AIChatbot: React.FC = () => {
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-4 bg-gray-50 scrollbar-hide space-y-4">
             {messages.map((msg) => (
-              <div 
-                key={msg.id} 
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              <div
+                key={msg.id}
+                className={`flex ${
+                  msg.role === "user" ? "justify-end" : "justify-start"
+                }`}
               >
-                <div 
+                <div
                   className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                    msg.role === 'user' 
-                      ? 'bg-primary text-white rounded-br-none' 
-                      : 'bg-white text-gray-800 shadow-sm border border-gray-100 rounded-bl-none'
+                    msg.role === "user"
+                      ? "bg-primary text-white rounded-br-none"
+                      : "bg-white text-gray-800 shadow-sm border border-gray-100 rounded-bl-none"
                   }`}
                 >
-                  {msg.role === 'model' && (
-                     <div className="flex items-center gap-1 text-primary text-xs font-bold mb-1 opacity-70">
-                        <Sparkles size={10} /> AI
-                     </div>
+                  {msg.role === "model" && (
+                    <div className="flex items-center gap-1 text-primary text-xs font-bold mb-1 opacity-70">
+                      <Sparkles size={10} /> AI
+                    </div>
                   )}
                   {msg.text}
                 </div>
               </div>
             ))}
-            
+
             {isLoading && (
               <div className="flex justify-start">
                 <div className="bg-white px-4 py-3 rounded-2xl rounded-bl-none shadow-sm border border-gray-100 flex items-center gap-2">
                   <Loader2 size={16} className="animate-spin text-primary" />
-                  <span className="text-xs text-gray-500">Đang suy nghĩ...</span>
+                  <span className="text-xs text-gray-500">
+                    Đang suy nghĩ...
+                  </span>
                 </div>
               </div>
             )}
@@ -155,7 +174,7 @@ const AIChatbot: React.FC = () => {
                 className="flex-1 bg-transparent border-none outline-none text-sm text-gray-800 placeholder-gray-400"
                 disabled={isLoading}
               />
-              <button 
+              <button
                 onClick={handleSend}
                 disabled={isLoading || !inputText.trim()}
                 className="text-primary disabled:opacity-50 disabled:cursor-not-allowed hover:scale-110 transition-transform"
@@ -164,7 +183,9 @@ const AIChatbot: React.FC = () => {
               </button>
             </div>
             <div className="text-center mt-2">
-                <span className="text-[10px] text-gray-400">Được hỗ trợ bởi Google Gemini</span>
+              <span className="text-[10px] text-gray-400">
+                Được hỗ trợ bởi Google Gemini
+              </span>
             </div>
           </div>
         </div>
